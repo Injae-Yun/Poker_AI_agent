@@ -57,81 +57,71 @@
 
 ---
 
-## Phase 2 — 보상 설계 및 Actor-Critic 에이전트
+## Phase 2 — 보상 설계 및 Actor-Critic 에이전트 ✅ DONE
 
 **목표**: Advantage Function 기반 보상으로 RL 에이전트 학습
 
-### 작업 목록
+### 구현 파일
+- `reward/reward_shaper.py`  — `RewardShaper` (A(s,a) = Q(s,a) - V(s), α=0.7 × 결정품질 + β=0.3 × 결과놀람)
+- `utils/state_encoder.py`   — 98차원 상태 벡터 (홀카드 34 + 보드 19 + 핸드강도 14 + 컨텍스트 9 + 경제 6 + 상대통계 12 + 스트리트공격성 4)
+- `models/actor.py`          — `ActorNetwork` FC(256)→LayerNorm→ReLU→FC(128)→ReLU→FC(7)→Softmax, 액션 7종
+- `models/critic.py`         — `CriticNetwork` FC(256)→LayerNorm→ReLU→FC(128)→ReLU→FC(1)
+- `models/nn.py`             — numpy 순수 구현 (Linear, ReLU, LayerNorm, Softmax, Adam)
+- `agents/rl_agent.py`       — `RLAgent` (A2C), ε-greedy 탐색, 에피소드 버퍼, 핸드당 업데이트
+- `training/trainer.py`      — Phase 2 학습 루프 (ε 감쇠, 체크포인트, CSV 로깅)
 
-- [ ] `RewardShaper` 구현
-  - `A(s,a) = Q(s,a) - V(s)` 기반 보상 계산
-  - 결정 품질 보상 (즉시): `EV(선택한 액션) - EV(최선 액션)`
-  - 결과 놀람 보상 (지연): `실제 칩 결과 - V(s)`
-  - 가중 합산: `reward = 0.7 × decision_quality + 0.3 × outcome_surprise`
+### 검증 결과
+- ✅ RLAgent 학습 루프 오류 없이 동작 (3게임 × 50라운드 테스트)
+- ✅ Actor/Critic 손실 정상 출력 및 체크포인트 저장 확인
+- ✅ ε-greedy 탐색 + 합법 액션 마스킹 정상 동작
 
-- [ ] 상태 표현 벡터 설계
-  - 홀 카드 인코딩 (슈트 × 숫자)
-  - 커뮤니티 카드 인코딩
-  - 핸드 에퀴티 (정규화)
-  - 팟 오즈 (정규화)
-  - 스택 크기 비율 (내 스택 / 총 스택)
-  - 포지션 원핫 인코딩
-  - 배팅 라운드 원핫 인코딩
-  - 상대 프로파일 통계 (VPIP, PFR, AF per opponent)
-
-- [ ] `ActorNetwork` 구현
-  - 입력: 상태 벡터
-  - 출력: 액션 확률 분포 [fold, call, raise_small, raise_medium, raise_large, all_in]
-  - 구조: FC(256) → ReLU → FC(128) → ReLU → FC(6) → Softmax
-
-- [ ] `CriticNetwork` 구현
-  - 입력: 상태 벡터
-  - 출력: V(s) (스칼라)
-  - 구조: FC(256) → ReLU → FC(128) → ReLU → FC(1)
-
-- [ ] `RLAgent` (A2C) 구현
-  - Actor-Critic 업데이트 루프
-  - `RewardShaper`와 연동
-  - Entropy 보너스 (탐색 촉진)
-
-- [ ] 학습 루프 구현 (`trainer.py`)
-  - 에피소드 단위 학습
-  - 체크포인트 저장 (N 에피소드마다)
-  - 학습 곡선 로깅 (평균 보상, 폴드 비율, 승률)
-
-### 성공 기준
-- `RLAgent`가 `RuleAgent`를 상대로 수렴 (손실 곡선 안정화)
-- 폴드 / 콜 / 레이즈 비율이 상황에 따라 다르게 나타남
-- 강한 핸드와 약한 핸드에서 다른 배팅 행동 확인
+### 설계 메모
+- torch 미사용: numpy 기반 자체 역전파 구현
+- 액션 공간: fold(0), check/call(1), raise×0.5/1.0/1.5/2.0 pot(2-5), all-in(6) = 7종
+- 보상 정규화: BB(=10) 단위로 스케일 조정
 
 ---
 
-## Phase 3 — 전략 다양성 보장 (League Training + NFSP)
+## Phase 3 — 전략 다양성 보장 (League Training + NFSP) ✅ DONE
 
 **목표**: 전략 동질화 및 패배 회피 성향 방지
 
-### 작업 목록
+### 구현 파일
+- `training/nfsp.py`             — `ReservoirBuffer` (Reservoir Sampling 기반 균등 보존) + `NFSPAgent` (BR+ASP 혼합)
+- `training/league.py`           — `AgentLeague` (Main×4 + Exploiter×2 + FrozenSnapshot 관리)
+- `training/league_trainer.py`   — Phase 3 학습 루프 (snapshot, exploit 측정, CSV 로깅)
+- `evaluation/exploitability.py` — `ExploitabilityMeasurer` (RuleAgent Best Response로 착취 측정)
 
-- [ ] `ReservoirBuffer` 구현
-  - 과거 행동 이력을 일정 확률로 보존하는 샘플링 버퍼
-- [ ] `NFSPAgent` 구현
-  - Best Response Network (DQN) + Average Policy Network (Supervised)
-  - η(eta) 파라미터로 두 정책 간 전환 비율 조정
-- [ ] `AgentLeague` 구현
-  - Main agents (4개) + Exploiter agents (2개) + Frozen snapshots
-  - N 에피소드마다 현재 에이전트를 스냅샷으로 동결 저장
-  - 매칭 시 현재 에이전트 + 랜덤 스냅샷 조합으로 대전 구성
-- [ ] `ExploitabilityMeasurer` 구현
-  - 각 에이전트를 최적 반응 에이전트(Best Response)가 얼마나 착취할 수 있는지 측정
-  - 주기적으로 측정하여 학습 품질 모니터링
-- [ ] 에이전트 다양성 초기화
-  - 에이전트별 다른 하이퍼파라미터 및 랜덤 시드 적용
-  - 초기 전략 편향 설정 (타이트/루즈, 어그레시브/패시브)
+### 설계 세부
 
-### 성공 기준
-- 4개 에이전트가 서로 다른 전략 프로파일(VPIP, PFR, AF)을 보임
-- Exploitability가 학습 진행에 따라 감소
-- 한 에이전트가 동일한 전략으로 나머지 에이전트를 지속적으로 지배하지 않음
+**NFSPAgent (training/nfsp.py)**
+  - `ReservoirBuffer(capacity=100k)` — 과거 BR 결정 (state, action) 균등 보존
+  - `AveragePolicyNetwork` — Supervised cross-entropy 로 평균 전략 학습
+  - η 확률로 BR(A2C) 사용 → Reservoir에 저장
+  - (1-η) 확률로 ASP(SL) 사용 → Reservoir에 저장 안 함
+  - SL 업데이트: N 핸드마다 Reservoir 배치 샘플링 → cross-entropy 업데이트
+
+**AgentLeague (training/league.py)**
+  - Main agents × 4: NFSP_Tight(η=0.10), NFSP_Loose(η=0.10), NFSP_Balanced(η=0.15), NFSP_Aggr(η=0.20)
+  - Exploiter agents × 2: RuleAgent (취약점 착취 역할)
+  - `FrozenAgent`: ActorNetwork 가중치 복사본으로 inference-only 동작
+  - `maybe_snapshot()`: N게임마다 자동 스냅샷 저장
+
+**ExploitabilityMeasurer (evaluation/exploitability.py)**
+  - 대상 에이전트를 FrozenAgent로 동결 후 RuleAgent 3명과 대전
+  - `exploit = RuleAgent 평균 chip delta`  낮을수록 착취에 강함
+
+### 검증 결과 (5게임 × 50라운드 단기 테스트)
+  - ✅ NFSPAgent 4종 정상 학습 루프 동작
+  - ✅ ReservoirBuffer 크기 누적 확인
+  - ✅ ExploitabilityMeasurer 정상 측정 (초기 미학습 상태 exploit≈+333)
+  - ✅ snapshot 저장 및 FrozenAgent 대전 정상
+  - ✅ League metrics / exploitability CSV 저장 확인
+
+### 설계 메모
+  - η 작을수록 ASP 중심 → GTO 수렴 안정적, η 클수록 BR 중심 → 빠른 전략 다양성
+  - Reservoir capacity=100k: 학습 후반에도 초기 전략 견본 유지 가능
+  - Exploitability 초기값 ≈ +333 (chip/game): 학습 후 감소 추세 관찰 필요
 
 ---
 

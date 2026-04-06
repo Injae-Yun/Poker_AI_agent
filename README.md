@@ -25,10 +25,10 @@
 
 | 구성 요소 | 선택 기술 |
 |-----------|-----------|
-| 게임 엔진 | [PyPokerEngine](https://github.com/ishikota/PyPokerEngine) |
-| 강화학습 | PyTorch + Actor-Critic (A2C) |
+| 게임 엔진 | 자체 구현 (Pure Python + numpy) |
+| 강화학습 | numpy 기반 Actor-Critic (A2C) |
+| 전략 다양성 | NFSP + League Training |
 | 에퀴티 계산 | Monte Carlo Simulation |
-| 실험 추적 | (추후 결정) |
 | 언어 | Python 3.10+ |
 
 ---
@@ -81,17 +81,23 @@ poker_agent/
 ## 빠른 시작
 
 ```bash
-# 의존성 설치
-pip install -r requirements.txt
+# 단일 게임 실행 (RuleAgent 1 vs Random 3)
+python run.py --mode single --rounds 100
 
-# 랜덤 에이전트 간 테스트 게임 실행
-python -m engine.game --players 4 --mode random
+# 비교 테스트 (50게임 × 200라운드)
+python run.py --mode test --games 50 --rounds 200
 
-# 룰 기반 에이전트 학습 (Phase 1)
-python -m training.trainer --agent rule --episodes 1000
+# Phase 2 — RL 에이전트 학습
+python -c "
+from training.trainer import Trainer, TrainingConfig
+Trainer(TrainingConfig(num_games=200, rounds_per_game=200)).train()
+"
 
-# RL 에이전트 학습 (Phase 2)
-python -m training.trainer --agent rl --episodes 100000
+# Phase 3 — League Training (NFSP)
+python -c "
+from training.league_trainer import LeagueTrainer, LeagueTrainingConfig
+LeagueTrainer(LeagueTrainingConfig(num_games=300, rounds_per_game=200)).train()
+"
 ```
 
 ---
