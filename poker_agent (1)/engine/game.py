@@ -31,6 +31,18 @@ from engine.state import (
 from agents.base_agent import BaseAgent
 
 
+def _config_to_dict(config: 'GameConfig') -> dict:
+    return {
+        "game_type":     config.game_type,
+        "num_players":   config.num_players,
+        "initial_stack": config.initial_stack,
+        "small_blind":   config.small_blind,
+        "big_blind":     config.big_blind,
+        "max_rounds":    config.max_rounds,
+        "seed":          config.seed,
+    }
+
+
 class _Player:
     """게임 내부에서 사용하는 플레이어 상태 (에이전트와 분리)"""
 
@@ -80,13 +92,19 @@ class _Player:
 class TexasHoldemGame:
     """텍사스 홀덤 게임 진행기"""
 
-    def __init__(self, agents: List[BaseAgent], config: GameConfig):
+    def __init__(
+        self,
+        agents:     List[BaseAgent],
+        config:     GameConfig,
+        logger=None,   # Optional[GameLogger] — 순환 임포트 방지로 타입 힌트 생략
+    ):
         assert len(agents) == config.num_players, \
             f"에이전트 수({len(agents)})가 설정 플레이어 수({config.num_players})와 다릅니다."
 
         self.config  = config
         self._rng    = random.Random(config.seed)
         self._deck   = Deck(seed=config.seed)
+        self._logger = logger  # GameLogger 인스턴스 (없으면 None)
 
         # 플레이어 객체 생성
         self._players: List[_Player] = [
@@ -113,7 +131,13 @@ class TexasHoldemGame:
             self._play_round()
             self._dealer_idx = (self._dealer_idx + 1) % len(self._players)
 
-        return self._build_game_result()
+        result = self._build_game_result()
+
+        # 로거 종료
+        if self._logger is not None:
+            self._logger.finalize(result)
+
+        return result
 
     # ══════════════════════════════════════════════════════
     #  라운드 진행
@@ -440,6 +464,10 @@ class TexasHoldemGame:
             ],
         }
         self._round_logs.append(log)
+
+        # 로거에 라운드 기록
+        if self._logger is not None:
+            self._logger.log_round(log)
 
         if self.config.verbose:
             self._print_round_summary(log)
