@@ -82,6 +82,65 @@
 
 ---
 
+## Phase 2.5 — PyTorch 전환 및 아키텍처 고도화 ✅ DONE
+
+**목표**: numpy 기반 신경망 → PyTorch 전환 + 듀얼 브랜치(MLP+GRU) 아키텍처 도입
+
+### 배경
+- 기존 Phase 2/3는 자체 numpy 역전파로 구현 (학습 효율 제한)
+- PyTorch 환경 확보 후 전환 결정
+- 상대 행동 시계열 정보를 GRU로 추적해 모델 고도화
+
+### 신규 / 변경 파일
+
+**`models/poker_net.py`** (신규)
+  - `PokerNet` : MLP + GRU 듀얼 브랜치 공유 트렁크
+    - MLP : Linear(104,256)+LayerNorm→Linear(256,256)+LayerNorm→Linear(256,128)
+    - GRU : input=15, hidden=64, layers=2, dropout=0.1
+    - Merge: Linear(192,64) → Actor head Linear(64,7) + Critic head Linear(64,1)
+  - Orthogonal 초기화, `make_optimizer()` (Adam lr=3e-4, eps=1e-5)
+  - `save()`/`load()` : `.pth` 포맷
+
+**`models/seq_encoder.py`** (신규)
+  - 베팅 히스토리 → GRU 입력 텐서 변환 (SEQ_DIM=15, MAX_SEQ_LEN=32)
+  - 스텝당 인코딩: is_self(1) + opp_slot_onehot(3) + action_onehot(5) + street_onehot(4) + amount_ratio(1) + stack_depth(1) = 15차원
+
+**`utils/state_encoder.py`** (변경)
+  - STATE_DIM : 98 → 104 (잔여 덱 6차원 추가)
+  - `_encode_remaining_deck()`: suit_remaining×4 + high_card_remaining×1 + total_remaining×1
+  - `encode()`: `deck_tracker` 옵셔널 파라미터 추가
+
+**`agents/rl_agent.py`** (전면 재작성)
+  - ActorNetwork + CriticNetwork → 단일 `PokerNet`
+  - `Transition`: `seq`, `seq_len` 필드 추가
+  - `_update()`: PyTorch tensors + F.log_softmax + MSE + 그래디언트 클리핑(0.5)
+  - 체크포인트: `net_P{id}_step_{N}.pth`
+
+**`training/nfsp.py`** (전면 재작성)
+  - `ReservoirBuffer`: (state, seq, seq_len, action_idx) 저장
+  - `NFSPAgent`: ASP 네트워크를 PokerNet으로 교체, PyTorch cross-entropy SL 업데이트
+  - 체크포인트: `net_P{id}_step_{N}.pth` + `asp_P{id}_step_{N}.pth`
+
+**`training/league.py`** (전면 재작성)
+  - `FrozenAgent`: ActorNetwork → PokerNet (actor_probs()로 추론)
+  - `Snapshot`: actor_state(numpy) → net_state_dict(torch)
+  - `maybe_snapshot()`: `agent._actor.net` → `agent.net`
+  - **BUG FIX**: 모든 에이전트가 같은 파일명으로 덮어쓰던 문제 해결 → 에이전트별 개별 파일명
+
+### 아키텍처 개선 근거
+
+| 개선 항목 | 이전 | 이후 | 효과 |
+|-----------|------|------|------|
+| 학습 프레임워크 | 자체 numpy 역전파 | PyTorch autograd | GPU 지원, 안정적 그래디언트 |
+| 상태 차원 | 98 | 104 | 잔여 덱 정보 학습 가능 |
+| 시퀀스 모델링 | 없음 | GRU(hidden=64,layers=2) | 상대 행동 변화 추적 |
+| 히든 레이어 | 2개 | 3개 (깊이 +1) | 더 높은 표현력 |
+| 정규화 | 없음 | LayerNorm ×2 | 학습 안정성 향상 |
+| 초기화 | 기본(Xavier) | Orthogonal | 초기 수렴 개선 |
+| 체크포인트 | .json (numpy dict) | .pth (torch state_dict) | 표준 포맷, 에이전트별 개별 파일 |
+
+---
+
 ## Phase 3 — 전략 다양성 보장 (League Training + NFSP) ✅ DONE
 
 **목표**: 전략 동질화 및 패배 회피 성향 방지

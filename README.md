@@ -26,10 +26,10 @@
 | 구성 요소 | 선택 기술 |
 |-----------|-----------|
 | 게임 엔진 | 자체 구현 (Pure Python + numpy) |
-| 강화학습 | numpy 기반 Actor-Critic (A2C) |
+| 강화학습 | PyTorch Actor-Critic (A2C), MLP+GRU 듀얼 브랜치 |
 | 전략 다양성 | NFSP + League Training |
 | 에퀴티 계산 | Monte Carlo Simulation |
-| 언어 | Python 3.10+ |
+| 언어 | Python 3.10+ / PyTorch |
 
 ---
 
@@ -50,21 +50,24 @@ poker_agent/
 │   ├── base_agent.py          # 에이전트 추상 클래스
 │   ├── random_agent.py        # 랜덤 에이전트 (베이스라인)
 │   ├── rule_agent.py          # 룰 기반 에이전트 (Phase 1)
-│   └── rl_agent.py            # 강화학습 에이전트 (Phase 2~3)
+│   └── rl_agent.py            # PyTorch Actor-Critic 에이전트 (Phase 2.5~)
 │
 ├── models/                    # 신경망 모델
-│   ├── actor.py               # 정책 네트워크 (Actor)
-│   ├── critic.py              # 가치 네트워크 (Critic)
-│   └── opponent_model.py      # 상대 모델링 네트워크
+│   ├── poker_net.py           # PokerNet: MLP+GRU 듀얼 브랜치 (Phase 2.5)
+│   ├── seq_encoder.py         # 베팅 히스토리 → 시퀀스 텐서 (GRU 입력)
+│   ├── actor.py               # (레거시) numpy Actor 네트워크
+│   ├── critic.py              # (레거시) numpy Critic 네트워크
+│   └── nn.py                  # (레거시) numpy 자체 구현 레이어
 │
 ├── reward/                    # 보상 설계
 │   ├── ev_calculator.py       # EV 계산 (팟 오즈, 에퀴티)
 │   └── reward_shaper.py       # Advantage Function 기반 보상
 │
 ├── training/                  # 학습 파이프라인
-│   ├── trainer.py             # 기본 학습 루프
-│   ├── league.py              # League Training 관리
-│   └── nfsp.py                # Neural Fictitious Self-Play
+│   ├── trainer.py             # Phase 2 학습 루프
+│   ├── league.py              # League Training 관리 (Phase 2.5 PyTorch)
+│   ├── league_trainer.py      # Phase 3 리그 학습 루프
+│   └── nfsp.py                # NFSP 에이전트 (Phase 2.5 PyTorch)
 │
 ├── evaluation/                # 평가 및 분석
 │   ├── evaluator.py           # 에이전트 성능 평가
@@ -73,6 +76,8 @@ poker_agent/
 └── utils/
     ├── hand_evaluator.py      # 핸드 강도 평가
     ├── deck_tracker.py        # 덱/카드 추적
+    ├── state_encoder.py       # AgentObservation → 104차원 상태 벡터 (Phase 2.5)
+    ├── opponent_profiler.py   # VPIP/PFR/AF 상대 통계
     └── stats.py               # 통계 집계
 ```
 

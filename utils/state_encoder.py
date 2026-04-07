@@ -1,7 +1,7 @@
 """
-state_encoder.py — AgentObservation → 98차원 상태 벡터 변환
+state_encoder.py — AgentObservation → 104차원 상태 벡터 변환
 
-인덱스 구조 (합계 = 98):
+인덱스 구조 (합계 = 104):
   [ 0: 34] 홀카드 인코딩  (카드1 rank×13 + suit×4 + 카드2 rank×13 + suit×4)
   [34: 53] 보드 인코딩    (rank 존재×13 + suit 비율×4 + pair/trips 플래그×2)
   [53: 67] 핸드 강도      (equity×1 + preflop_strength×1 + hand_rank×10 + suited/paired×2)
@@ -9,6 +9,9 @@ state_encoder.py — AgentObservation → 98차원 상태 벡터 변환
   [76: 82] 경제 지표      (my_stack + pot + pot_odds + call_norm + raises + stack_bb)
   [82: 94] 상대 통계      (3명 × 4 = vpip, pfr, af_norm, est_strength)
   [94: 98] 스트리트 공격성 (4 스트리트 × 1)
+  [98:104] 잔여 덱 정보   (suit_remaining×4 + high_card_remaining×1 + total_remaining×1)
+
+Phase 2.5: 98 → 104차원 (잔여 덱 정보 6차원 추가)
 """
 
 import numpy as np
@@ -24,7 +27,10 @@ RANKS  = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
 SUITS  = ['s', 'h', 'd', 'c']
 STREETS = ['preflop', 'flop', 'turn', 'river']
 
-STATE_DIM = 98
+# 하이카드로 간주하는 랭크 (A, K, Q, J, T) — 총 5×4=20장
+_HIGH_RANKS = {'A', 'K', 'Q', 'J', 'T'}
+
+STATE_DIM = 104   # Phase 2.5: 98 → 104
 
 # HAND_RANK: HIGH_CARD=1 … ROYAL_FLUSH=10 → 인덱스 0~9
 _HAND_RANK_ORDER = [
@@ -36,8 +42,11 @@ _HAND_RANK_ORDER = [
 
 class StateEncoder:
     """
-    AgentObservation을 (98,) float32 numpy 배열로 변환합니다.
+    AgentObservation을 (104,) float32 numpy 배열로 변환합니다.
     모든 값은 [0, 1] 범위로 정규화됩니다.
+
+    Phase 2.5: DeckTracker를 옵셔널로 받아 잔여 덱 정보(6차원)를 추가.
+    deck_tracker=None이면 0.5 사전확률로 채움.
     """
 
     def __init__(self, initial_stack: int = 1000, big_blind: int = 10):
@@ -52,8 +61,9 @@ class StateEncoder:
         self,
         obs: AgentObservation,
         profiler: Optional[OpponentProfiler] = None,
+        deck_tracker=None,   # Optional[DeckTracker]  — 순환 임포트 방지를 위해 타입 힌트 생략
     ) -> np.ndarray:
-        """AgentObservation → (98,) float32"""
+        """AgentObservation → (104,) float32"""
         parts = [
             self._encode_hole_cards(obs.hole_cards),          # 34
             self._encode_board(obs.community_cards),           # 19
@@ -62,6 +72,7 @@ class StateEncoder:
             self._encode_economics(obs),                       # 6
             self._encode_opponents(obs, profiler),             # 12
             self._encode_street_aggression(obs),               # 4
+            self._encode_remaining_deck(deck_tracker),         # 6
         ]
         vec = np.concatenate(parts).astype(np.float32)
 
@@ -221,6 +232,42 @@ class StateEncoder:
                 vec[base + 1] = 0.15  # pfr 사전확률
                 vec[base + 2] = 0.5   # af_norm 중립
                 vec[base + 3] = 0.5   # est_strength 중립
+
+        return vec
+
+    def _encode_remaining_deck(self, deck_tracker) -> np.ndarray:
+        """
+        잔여 덱 정보 → (6,)
+
+        [0..3] suit_remaining : 각 수트별 잔여 카드 수 / 13.0
+        [4]    high_remaining  : 하이카드(A/K/Q/J/T) 잔여 수 / 20.0
+        [5]    total_remaining : 전체 잔여 수 / 52.0
+        """
+        vec = np.zeros(6, dtype=np.float32)
+
+        if deck_tracker is None:
+            # 사전확률 (아직 카드를 보지 못한 상태)
+            vec[0:4] = 1.0    # 13/13 → 1.0
+            vec[4]   = 1.0    # 20/20 → 1.0
+            vec[5]   = 1.0    # 52/52 → 1.0
+            return vec
+
+        remaining = deck_tracker.remaining
+        if not remaining:
+            return vec
+
+        suit_counts = {s: 0 for s in SUITS}
+        high_count  = 0
+        for card in remaining:
+            suit_counts[card.suit] += 1
+            if card.rank in _HIGH_RANKS:
+                high_count += 1
+
+        for i, s in enumerate(SUITS):
+            vec[i] = suit_counts[s] / 13.0
+
+        vec[4] = high_count / 20.0
+        vec[5] = len(remaining) / 52.0
 
         return vec
 
