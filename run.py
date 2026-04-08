@@ -60,8 +60,8 @@ def parse_args():
                    ))
     p.add_argument("--rounds",  type=int, default=100,
                    help="라운드 수 (기본: 100)")
-    p.add_argument("--stack",   type=int, default=1000,
-                   help="초기 칩 (기본: 1000)")
+    p.add_argument("--stack",   type=int, default=10000,
+                   help="초기 칩 (기본: 10000)")
     p.add_argument("--games",   type=int, default=50,
                    help="test/train 모드 게임 수 (기본: 50)")
     p.add_argument("--seed",    type=int, default=42)
@@ -207,8 +207,8 @@ def run_single(args):
     )
 
     _print_summary(result, agent_names, config.initial_stack)
-    print(f"\n📄 게임 로그  : {logger.json_path}")
-    print(f"📊 리포트    : {report_path}")
+    print(f"\n게임 로그  : {logger.json_path}")
+    print(f"리포트    : {report_path}")
 
 
 # ── test ───────────────────────────────────────────────────
@@ -270,8 +270,8 @@ def run_test(args):
     report_path = session_rep.save_report(title, agent_names, config_dict)
     csv_path    = session_rep.save_csv(title)
 
-    print(f"\n📊 비교 리포트 : {report_path}")
-    print(f"📈 CSV 데이터  : {csv_path}")
+    print(f"\n비교 리포트 : {report_path}")
+    print(f"CSV 데이터  : {csv_path}")
 
 
 # ── train2 ─────────────────────────────────────────────────

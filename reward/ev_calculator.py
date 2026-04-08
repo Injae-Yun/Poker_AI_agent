@@ -39,7 +39,7 @@ class EVCalculator:
     관찰 정보(AgentObservation)를 바탕으로 각 액션의 EV를 계산합니다.
     """
 
-    def __init__(self, simulations: int = 400):
+    def __init__(self, simulations: int = 100):
         self.simulations = simulations
 
     # ── 메인 계산 ──────────────────────────────────────────
@@ -47,6 +47,7 @@ class EVCalculator:
         self,
         obs:            AgentObservation,
         fold_probability_by_raise: Optional[Dict[int, float]] = None,
+        precomputed_equity: Optional[float] = None,
     ) -> ActionEV:
         """
         현재 관찰을 기반으로 모든 액션의 EV를 계산합니다.
@@ -55,16 +56,20 @@ class EVCalculator:
             obs: 에이전트 관찰 정보
             fold_probability_by_raise: {raise_amount: fold_prob} 상대 폴드 확률
                 None이면 기본값(팟 크기 기반 추정)을 사용합니다.
+            precomputed_equity: 외부에서 이미 계산된 equity (MC 중복 방지)
         """
         num_opponents = obs.active_players - 1
 
-        # ── 에퀴티 계산 ────────────────────────────────────
-        equity = equity_by_street(
-            hole_cards      = obs.hole_cards,
-            community_cards = obs.community_cards,
-            num_opponents   = max(1, num_opponents),
-            simulations     = self.simulations,
-        )
+        # ── 에퀴티 계산 (외부 주입값 우선 사용) ──────────────
+        if precomputed_equity is not None:
+            equity = precomputed_equity
+        else:
+            equity = equity_by_street(
+                hole_cards      = obs.hole_cards,
+                community_cards = obs.community_cards,
+                num_opponents   = max(1, num_opponents),
+                simulations     = self.simulations,
+            )
 
         # ── 팟 오즈 ────────────────────────────────────────
         total_pot_if_call = obs.pot + obs.call_amount

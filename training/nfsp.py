@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Tuple
 
-from agents.rl_agent import RLAgent, Transition
+from agents.rl_agent import RLAgent, Transition, DEVICE
 from engine.state import AgentObservation
 from models.poker_net import PokerNet, make_optimizer, ACTION_DIM, MAX_SEQ_LEN, SEQ_DIM
 from models.seq_encoder import encode_betting_history
@@ -129,12 +129,12 @@ class NFSPAgent(RLAgent):
         epsilon:              float = 0.06,
         gamma:                float = 0.99,
         update_every:         int   = 1,
-        reservoir_capacity:   int   = 100_000,
+        reservoir_capacity:   int   = 20_000,
         sl_batch_size:        int   = 128,
         sl_update_every:      int   = 5,
         initial_stack:        int   = 1000,
         big_blind:            int   = 10,
-        device:               str   = 'cpu',
+        device:               str   = DEVICE,
         seed:                 Optional[int] = None,
     ):
         super().__init__(

@@ -61,18 +61,19 @@ class StateEncoder:
         self,
         obs: AgentObservation,
         profiler: Optional[OpponentProfiler] = None,
-        deck_tracker=None,   # Optional[DeckTracker]  — 순환 임포트 방지를 위해 타입 힌트 생략
+        deck_tracker=None,      # Optional[DeckTracker]  — 순환 임포트 방지를 위해 타입 힌트 생략
+        precomputed_equity: Optional[float] = None,  # 외부에서 계산된 equity (중복 MC 방지)
     ) -> np.ndarray:
         """AgentObservation → (104,) float32"""
         parts = [
-            self._encode_hole_cards(obs.hole_cards),          # 34
-            self._encode_board(obs.community_cards),           # 19
-            self._encode_hand_strength(obs),                   # 14
-            self._encode_context(obs),                         # 9
-            self._encode_economics(obs),                       # 6
-            self._encode_opponents(obs, profiler),             # 12
-            self._encode_street_aggression(obs),               # 4
-            self._encode_remaining_deck(deck_tracker),         # 6
+            self._encode_hole_cards(obs.hole_cards),                        # 34
+            self._encode_board(obs.community_cards),                         # 19
+            self._encode_hand_strength(obs, precomputed_equity),             # 14
+            self._encode_context(obs),                                       # 9
+            self._encode_economics(obs),                                     # 6
+            self._encode_opponents(obs, profiler),                           # 12
+            self._encode_street_aggression(obs),                             # 4
+            self._encode_remaining_deck(deck_tracker),                       # 6
         ]
         vec = np.concatenate(parts).astype(np.float32)
 
@@ -131,13 +132,16 @@ class StateEncoder:
 
         return vec
 
-    def _encode_hand_strength(self, obs: AgentObservation) -> np.ndarray:
+    def _encode_hand_strength(self, obs: AgentObservation, precomputed_equity: Optional[float] = None) -> np.ndarray:
         """핸드 강도 → (14,) [equity + preflop_str + hand_rank×10 + suited + paired]"""
         vec = np.zeros(14, dtype=np.float32)
         num_opp = max(1, obs.active_players - 1)
 
-        # equity (0)
-        equity = equity_by_street(obs.hole_cards, obs.community_cards, num_opp)
+        # equity (0) — 외부에서 이미 계산된 값 있으면 재사용 (MC 중복 방지)
+        if precomputed_equity is not None:
+            equity = precomputed_equity
+        else:
+            equity = equity_by_street(obs.hole_cards, obs.community_cards, num_opp)
         vec[0] = float(np.clip(equity, 0.0, 1.0))
 
         # preflop strength (1)

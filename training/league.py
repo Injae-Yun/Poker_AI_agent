@@ -22,6 +22,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Any
 
@@ -52,7 +54,7 @@ class FrozenAgent(BaseAgent):
         name:          str = "Frozen",
         initial_stack: int = 1000,
         big_blind:     int = 10,
-        device:        str = 'cpu',
+        device:        str = DEVICE,
     ):
         super().__init__(player_id, name)
 
@@ -147,7 +149,7 @@ class AgentLeague:
 
     def __init__(
         self,
-        initial_stack:    int   = 1000,
+        initial_stack:    int   = 10000,
         small_blind:      int   = 5,
         big_blind:        int   = 10,
         snapshot_every:   int   = 10,

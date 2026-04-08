@@ -70,7 +70,7 @@ def monte_carlo_equity(
     hole_cards:      List[Card],
     community_cards: List[Card],
     num_opponents:   int,
-    simulations:     int = 500,
+    simulations:     int = 100,
     seed:            Optional[int] = None,
 ) -> float:
     """
@@ -136,7 +136,7 @@ def equity_by_street(
     hole_cards:      List[Card],
     community_cards: List[Card],
     num_opponents:   int,
-    simulations:     int = 300,
+    simulations:     int = 100,
 ) -> float:
     """
     현재 스트리트에 맞는 시뮬레이션 횟수를 자동 조정하여

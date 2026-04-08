@@ -25,12 +25,14 @@ from models.seq_encoder import encode_betting_history, INITIAL_STACK
 from reward.reward_shaper import RewardShaper, action_idx_to_decision, build_valid_mask
 from utils.state_encoder import StateEncoder
 from utils.opponent_profiler import OpponentProfiler
+from utils.hand_evaluator import equity_by_street
 
 
 # ── 하이퍼파라미터 기본값 ─────────────────────────────────
 GAMMA        = 0.99    # 할인율
 ENTROPY_COEF = 0.02    # 엔트로피 보너스
 CLIP_GRAD    = 0.5     # 그래디언트 클리핑
+DEVICE       = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 @dataclass
@@ -66,7 +68,7 @@ class RLAgent(BaseAgent):
         update_every:  int   = 1,      # N 핸드마다 업데이트
         initial_stack: int   = 1000,
         big_blind:     int   = 10,
-        device:        str   = 'cpu',
+        device:        str   = DEVICE,
         seed:          Optional[int] = None,
     ):
         super().__init__(player_id, name)
@@ -88,7 +90,7 @@ class RLAgent(BaseAgent):
         self.optim = make_optimizer(self.net, lr=lr)
 
         # ── 보상 설계 ──────────────────────────────────────
-        self._shaper = RewardShaper()
+        self._shaper = RewardShaper(bb_scale=initial_stack / 100)
 
         # ── 상태 인코더 ────────────────────────────────────
         self._encoder = StateEncoder(initial_stack=initial_stack, big_blind=big_blind)
@@ -120,6 +122,7 @@ class RLAgent(BaseAgent):
             big_blind=config.big_blind,
         )
         self.initial_stack = config.initial_stack
+        self._shaper = RewardShaper(bb_scale=config.initial_stack / 100)
 
     def on_round_start(self, round_num: int) -> None:
         super().on_round_start(round_num)
@@ -133,8 +136,13 @@ class RLAgent(BaseAgent):
 
     def declare_action(self, obs: AgentObservation) -> Dict[str, Any]:
         """상태 인코딩 → 정책 샘플링 → 액션 반환"""
-        # 상태 벡터 (104차원)
-        state = self._encoder.encode(obs, self._profiler, self._deck_tracker)
+        # equity 1회만 계산 (StateEncoder + RewardShaper 공유 → MC 중복 제거)
+        num_opp = max(1, obs.active_players - 1)
+        equity = equity_by_street(obs.hole_cards, obs.community_cards, num_opp)
+
+        # 상태 벡터 (104차원) — 계산된 equity 주입
+        state = self._encoder.encode(obs, self._profiler, self._deck_tracker,
+                                     precomputed_equity=equity)
 
         # 시퀀스 인코딩 (베팅 히스토리 → GRU 입력)
         seq, seq_len = encode_betting_history(
@@ -187,7 +195,8 @@ class RLAgent(BaseAgent):
         ))
         self._hand_baseline_vs.append(value)
 
-        self._shaper.on_action(obs, decision['action'], decision['amount'], value)
+        self._shaper.on_action(obs, decision['action'], decision['amount'], value,
+                               precomputed_equity=equity)
         self._record_action(decision['action'])
         return decision
 

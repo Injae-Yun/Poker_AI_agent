@@ -1,0 +1,125 @@
+{
+  "snapshots": [
+    {
+      "step": 120,
+      "source_id": 0,
+      "eta": 0.1,
+      "avg_chip_delta": 6000.0
+    },
+    {
+      "step": 120,
+      "source_id": 1,
+      "eta": 0.1,
+      "avg_chip_delta": -2000.0
+    },
+    {
+      "step": 120,
+      "source_id": 2,
+      "eta": 0.15,
+      "avg_chip_delta": -6000.0
+    },
+    {
+      "step": 120,
+      "source_id": 3,
+      "eta": 0.2,
+      "avg_chip_delta": 2000.0
+    },
+    {
+      "step": 135,
+      "source_id": 0,
+      "eta": 0.1,
+      "avg_chip_delta": -2000.0
+    },
+    {
+      "step": 135,
+      "source_id": 1,
+      "eta": 0.1,
+      "avg_chip_delta": 2000.0
+    },
+    {
+      "step": 135,
+      "source_id": 2,
+      "eta": 0.15,
+      "avg_chip_delta": 6000.0
+    },
+    {
+      "step": 135,
+      "source_id": 3,
+      "eta": 0.2,
+      "avg_chip_delta": -6000.0
+    },
+    {
+      "step": 150,
+      "source_id": 0,
+      "eta": 0.1,
+      "avg_chip_delta": -2000.0
+    },
+    {
+      "step": 150,
+      "source_id": 1,
+      "eta": 0.1,
+      "avg_chip_delta": -6000.0
+    },
+    {
+      "step": 150,
+      "source_id": 2,
+      "eta": 0.15,
+      "avg_chip_delta": 10000.0
+    },
+    {
+      "step": 150,
+      "source_id": 3,
+      "eta": 0.2,
+      "avg_chip_delta": -2000.0
+    },
+    {
+      "step": 165,
+      "source_id": 0,
+      "eta": 0.1,
+      "avg_chip_delta": 14000.0
+    },
+    {
+      "step": 165,
+      "source_id": 1,
+      "eta": 0.1,
+      "avg_chip_delta": -6000.0
+    },
+    {
+      "step": 165,
+      "source_id": 2,
+      "eta": 0.15,
+      "avg_chip_delta": -6000.0
+    },
+    {
+      "step": 165,
+      "source_id": 3,
+      "eta": 0.2,
+      "avg_chip_delta": -2000.0
+    },
+    {
+      "step": 180,
+      "source_id": 0,
+      "eta": 0.1,
+      "avg_chip_delta": -2000.0
+    },
+    {
+      "step": 180,
+      "source_id": 1,
+      "eta": 0.1,
+      "avg_chip_delta": -2000.0
+    },
+    {
+      "step": 180,
+      "source_id": 2,
+      "eta": 0.15,
+      "avg_chip_delta": 2000.0
+    },
+    {
+      "step": 180,
+      "source_id": 3,
+      "eta": 0.2,
+      "avg_chip_delta": 2000.0
+    }
+  ],
+  "game_count": 179
+}

@@ -33,7 +33,7 @@ _ACTION2IDX = {
 }
 _STREET2IDX = {s: i for i, s in enumerate(STREETS)}   # preflop=0..river=3
 
-INITIAL_STACK = 1000   # config와 일치시킴 (정규화 기준)
+INITIAL_STACK = 10000   # config와 일치시킴 (정규화 기준)
 
 
 def encode_betting_history(

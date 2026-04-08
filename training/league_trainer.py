@@ -16,6 +16,7 @@ league_trainer.py — Phase 3 League Training 학습 루프
 import os
 import csv
 import json
+import shutil
 import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
@@ -31,7 +32,7 @@ from evaluation.exploitability import ExploitabilityMeasurer
 class LeagueTrainingConfig:
     num_games:           int   = 300
     rounds_per_game:     int   = 200
-    initial_stack:       int   = 1000
+    initial_stack:       int   = 10000
     small_blind:         int   = 5
     big_blind:           int   = 10
     snapshot_every:      int   = 15    # N게임마다 스냅샷
@@ -45,6 +46,9 @@ class LeagueTrainingConfig:
     checkpoint_dir:      str   = "checkpoints/league"
     log_dir:             str   = "logs/league"
     seed:                int   = 42
+    # ── Early Stop / Best Model ────────────────────────────
+    early_stop_patience: int   = 60    # exploit 측정 N게임 이상 개선 없으면 중단 (0 = 비활성)
+    min_games:           int   = 90    # early stop 검사 시작 게임 수 (exploit 3회 이후)
 
 
 class LeagueTrainer:
@@ -55,6 +59,9 @@ class LeagueTrainer:
         self._metrics: List[Dict] = []
         self._exploit_history: List[Dict] = []
         self._league: Optional[AgentLeague] = None
+        # best model tracking (에이전트별): exploit 평균 낮을수록 좋음
+        self._best_exploit: Dict[str, float] = {}   # {agent_name: best avg exploit}
+        self._no_improve_cnt: int = 0
 
     # ══════════════════════════════════════════════════════
     #  메인 학습 루프
@@ -120,16 +127,26 @@ class LeagueTrainer:
             if (game_idx + 1) % cfg.log_every == 0:
                 self._log(game_idx + 1)
                 if snapshotted:
-                    print(f"  📸 스냅샷 저장 (game {game_idx+1})")
+                    print(f"  [스냅샷 저장] game {game_idx+1}")
 
-            # ── 착취가능성 측정 ───────────────────────────────
+            # ── 착취가능성 측정 + best model + early stop ────────
             if (game_idx + 1) % cfg.exploit_every == 0:
                 self._measure_exploitability(game_idx + 1, measurer)
+                if (game_idx + 1) >= cfg.min_games:
+                    improved = self._update_best_models(game_idx + 1)
+                    if not improved and cfg.early_stop_patience > 0:
+                        if self._no_improve_cnt * cfg.exploit_every >= cfg.early_stop_patience:
+                            print(
+                                f"\n[Early Stop] {cfg.early_stop_patience}게임 동안 "
+                                f"exploit 개선 없음 (game {game_idx + 1}/{cfg.num_games})"
+                            )
+                            self._league.save(cfg.checkpoint_dir, game_idx + 1)
+                            break
 
             # ── 체크포인트 ────────────────────────────────────
             if (game_idx + 1) % cfg.checkpoint_every == 0:
                 self._league.save(cfg.checkpoint_dir, game_idx + 1)
-                print(f"  💾 체크포인트 저장 (step={game_idx+1})")
+                print(f"  [체크포인트 저장] step={game_idx+1}")
 
         # 최종 처리
         self._league.save(cfg.checkpoint_dir, cfg.num_games)
@@ -171,6 +188,58 @@ class LeagueTrainer:
             row[f'p{i}_reservoir']   = agent.reservoir_size
 
         return row
+
+    def _update_best_models(self, game_num: int) -> bool:
+        """
+        최근 exploit 측정값으로 best model 판정.
+        에이전트 전체 평균 exploitability가 개선됐으면 True + best checkpoint 갱신.
+        """
+        if not self._exploit_history:
+            return False
+
+        cfg  = self.config
+        last = self._exploit_history[-1]
+
+        # 전체 에이전트 평균 exploitability (낮을수록 좋음)
+        exploit_vals = [v for k, v in last.items() if k.endswith('_exploit')]
+        if not exploit_vals:
+            return False
+        avg_exploit = sum(exploit_vals) / len(exploit_vals)
+
+        improved = False
+        for agent in self._league.main_agents:
+            name = agent.name
+            agent_key = f"{name}_exploit"
+            if agent_key not in last:
+                continue
+            val = last[agent_key]
+            if name not in self._best_exploit or val < self._best_exploit[name]:
+                self._best_exploit[name] = val
+                # best checkpoint 저장
+                src_net = os.path.join(cfg.checkpoint_dir, f"net_P{agent.player_id}_step_{game_num}.pth")
+                src_asp = os.path.join(cfg.checkpoint_dir, f"asp_P{agent.player_id}_step_{game_num}.pth")
+                dst_net = os.path.join(cfg.checkpoint_dir, f"best_net_P{agent.player_id}.pth")
+                dst_asp = os.path.join(cfg.checkpoint_dir, f"best_asp_P{agent.player_id}.pth")
+                # 아직 이 step 체크포인트가 없으면 임시 저장
+                if not os.path.exists(src_net):
+                    agent.save(cfg.checkpoint_dir, game_num)
+                if os.path.exists(src_net):
+                    shutil.copy2(src_net, dst_net)
+                if os.path.exists(src_asp):
+                    shutil.copy2(src_asp, dst_asp)
+                improved = True
+
+        if improved:
+            print(
+                f"  [Best Model] step={game_num}"
+                f"  avg_exploit={avg_exploit:+.1f}"
+                f"  -> best_net/asp_P{{i}}.pth"
+            )
+            self._no_improve_cnt = 0
+        else:
+            self._no_improve_cnt += 1
+
+        return improved
 
     def _measure_exploitability(
         self,
@@ -225,18 +294,18 @@ class LeagueTrainer:
             return
         path = os.path.join(self.config.log_dir, "league_metrics.csv")
         _write_csv(path, self._metrics)
-        print(f"  📈 메트릭 저장: {path}")
+        print(f"  [메트릭 저장] {path}")
 
     def _save_exploit_csv(self) -> None:
         if not self._exploit_history:
             return
         path = os.path.join(self.config.log_dir, "exploitability.csv")
         _write_csv(path, self._exploit_history)
-        print(f"  📉 착취가능성 저장: {path}")
+        print(f"  [착취가능성 저장] {path}")
 
     def _print_final_summary(self) -> None:
         print(f"\n{'='*60}")
-        print(f"League Training 완료 — {self.config.num_games}게임")
+        print(f"League Training 완료 ({self.config.num_games}게임)")
         print(f"{'='*60}")
 
         stats = self._league.get_stats()

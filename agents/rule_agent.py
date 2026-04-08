@@ -45,7 +45,7 @@ class RuleAgent(BaseAgent):
         verbose:   bool = False,
     ):
         super().__init__(player_id, name)
-        self._ev_calc   = EVCalculator(simulations=400)
+        self._ev_calc   = EVCalculator(simulations=100)
         self._profiler  = OpponentProfiler()
         self._rng       = random.Random(seed)
         self._verbose   = verbose

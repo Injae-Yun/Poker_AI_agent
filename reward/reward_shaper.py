@@ -67,17 +67,18 @@ class RewardShaper:
 
     def on_action(
         self,
-        obs:         AgentObservation,
-        action:      str,
-        amount:      int,
-        baseline_v:  float,            # Critic의 V(s) 추정값
+        obs:               AgentObservation,
+        action:            str,
+        amount:            int,
+        baseline_v:        float,           # Critic의 V(s) 추정값
+        precomputed_equity: Optional[float] = None,  # MC 중복 방지
     ) -> StepReward:
         """
         액션 직후 호출.
         EV 기반 결정 품질을 즉시 계산하고, 버퍼에 저장합니다.
         outcome_surprise는 핸드 종료 후 채워집니다.
         """
-        ev = self._ev_calc.calculate(obs)
+        ev = self._ev_calc.calculate(obs, precomputed_equity=precomputed_equity)
 
         # 선택한 액션의 EV
         if action == ACTION_FOLD:
