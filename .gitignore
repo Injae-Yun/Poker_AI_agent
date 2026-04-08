@@ -3,3 +3,12 @@
 
 # ignore docx
 *.docx
+
+# 파일들
+*.pyc
+*__pycache__/
+*.pth
+*.json
+
+# ignore log files
+*.log
