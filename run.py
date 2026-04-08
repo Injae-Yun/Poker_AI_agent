@@ -75,6 +75,8 @@ def parse_args():
                    help="로드할 체크포인트 스텝 번호 (없으면 자동 탐색)")
     p.add_argument("--exploit-games", type=int, default=20,
                    help="착취가능성 측정 게임 수 (기본: 20)")
+    p.add_argument("--resume-step", type=int, default=0,
+                   help="train3 재개 시 로드할 체크포인트 스텝 (기본: 0=처음부터)")
     return p.parse_args()
 
 
@@ -311,6 +313,7 @@ def run_train3(args):
         rounds_per_game = args.rounds,
         initial_stack   = args.stack,
         seed            = args.seed,
+        resume_step     = args.resume_step,
     )
 
     print(f"[run:train3] Phase 3 League Training (NFSP)")

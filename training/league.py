@@ -223,8 +223,9 @@ class AgentLeague:
             snap = self._snapshots[int(self._rng.integers(0, len(self._snapshots)))]
 
             # FrozenAgent에 PokerNet 복원
-            net = PokerNet().to(self.device)
-            net.load_state_dict(snap.net_state_dict)
+            net = PokerNet()
+            net.load_state_dict({k: v.to(self.device) for k, v in snap.net_state_dict.items()})
+            net.to(self.device)
             net.eval()
 
             occupied = {a.player_id for a in agents if not isinstance(a, NFSPAgent)}

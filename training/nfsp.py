@@ -130,7 +130,7 @@ class NFSPAgent(RLAgent):
         gamma:                float = 0.99,
         update_every:         int   = 1,
         reservoir_capacity:   int   = 20_000,
-        sl_batch_size:        int   = 128,
+        sl_batch_size:        int   = 32,
         sl_update_every:      int   = 5,
         initial_stack:        int   = 1000,
         big_blind:            int   = 10,

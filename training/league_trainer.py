@@ -49,6 +49,8 @@ class LeagueTrainingConfig:
     # ── Early Stop / Best Model ────────────────────────────
     early_stop_patience: int   = 60    # exploit 측정 N게임 이상 개선 없으면 중단 (0 = 비활성)
     min_games:           int   = 90    # early stop 검사 시작 게임 수 (exploit 3회 이후)
+    # ── Resume ────────────────────────────────────────────
+    resume_step:         int   = 0     # 0 = 처음부터, >0 = 해당 스텝 체크포인트에서 재개
 
 
 class LeagueTrainer:
@@ -92,13 +94,20 @@ class LeagueTrainer:
             seed          = cfg.seed + 50000,
         )
 
+        # ── Resume: 체크포인트에서 이어서 학습 ────────────────
+        start_game = 0
+        if cfg.resume_step > 0:
+            self._league.load(cfg.checkpoint_dir, cfg.resume_step)
+            start_game = cfg.resume_step
+            print(f"  [재개] step={cfg.resume_step} 체크포인트 로드 완료  game {start_game}부터 재개")
+
         print(f"\n{'='*60}")
-        print(f"Phase 3 League Training 시작")
+        print(f"Phase 3 League Training {'재개' if cfg.resume_step > 0 else '시작'}")
         print(f"  에이전트: {[a.name for a in self._league.main_agents]}")
-        print(f"  총 게임: {cfg.num_games} × {cfg.rounds_per_game}라운드")
+        print(f"  게임: {start_game} ~ {start_game + cfg.num_games} × {cfg.rounds_per_game}라운드")
         print(f"{'='*60}\n")
 
-        for game_idx in range(cfg.num_games):
+        for game_idx in range(start_game, start_game + cfg.num_games):
 
             # ── 매칭 구성 & 게임 실행 ────────────────────────
             agents = self._league.create_matchup()
@@ -149,7 +158,7 @@ class LeagueTrainer:
                 print(f"  [체크포인트 저장] step={game_idx+1}")
 
         # 최종 처리
-        self._league.save(cfg.checkpoint_dir, cfg.num_games)
+        self._league.save(cfg.checkpoint_dir, start_game + cfg.num_games)
         self._save_metrics_csv()
         self._save_exploit_csv()
         self._print_final_summary()
