@@ -48,18 +48,24 @@ class RewardShaper:
 
     def __init__(
         self,
-        ev_simulations: int   = 300,
-        alpha:          float = ALPHA,
-        beta:           float = BETA,
-        bb_scale:       float = BB_SCALE,
+        ev_simulations:      int   = 300,
+        alpha:               float = ALPHA,
+        beta:                float = BETA,
+        bb_scale:            float = BB_SCALE,
+        raise_penalty_coef:  float = 0.05,   # 과도한 레이즈 억제 패널티 계수
+        raise_penalty_thresh: float = 0.5,   # 핸드 내 레이즈율이 이 이상이면 패널티
     ):
         self._ev_calc  = EVCalculator(simulations=ev_simulations)
         self.alpha     = alpha
         self.beta      = beta
         self.bb_scale  = bb_scale
+        self.raise_penalty_coef   = raise_penalty_coef
+        self.raise_penalty_thresh = raise_penalty_thresh
 
         # 핸드 진행 중 결정 버퍼
         self._pending: list = []   # List[StepReward]
+        self._raise_count  = 0
+        self._action_count = 0
 
     # ══════════════════════════════════════════════════════
     #  핸드 진행 중 호출
@@ -92,8 +98,20 @@ class RewardShaper:
         best_ev = max(ev.fold_ev, ev.call_ev, ev.raise_ev)
         decision_quality = (chosen_ev - best_ev) / self.bb_scale
 
+        # 레이즈 빈도 추적
+        self._action_count += 1
+        if action == ACTION_RAISE:
+            self._raise_count += 1
+
+        # 과도한 레이즈 패널티: 레이즈율이 임계값 초과 시 소액 차감
+        raise_penalty = 0.0
+        if self._action_count > 0:
+            raise_rate = self._raise_count / self._action_count
+            if raise_rate > self.raise_penalty_thresh:
+                raise_penalty = -self.raise_penalty_coef * (raise_rate - self.raise_penalty_thresh)
+
         step = StepReward(
-            decision_quality = decision_quality,
+            decision_quality = decision_quality + raise_penalty,
             outcome_surprise = 0.0,   # 핸드 종료 후 채움
             total            = 0.0,   # 핸드 종료 후 확정
             ev               = ev,
@@ -141,6 +159,8 @@ class RewardShaper:
     def reset(self) -> None:
         """핸드 시작 시 버퍼 초기화"""
         self._pending.clear()
+        self._raise_count  = 0
+        self._action_count = 0
 
 
 # ══════════════════════════════════════════════════════════

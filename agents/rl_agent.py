@@ -252,15 +252,18 @@ class RLAgent(BaseAgent):
         # ── Discounted Returns 계산 ───────────────────────
         returns = self._compute_returns(rewards, dones)  # (B,)
 
+        # ── Returns 정규화 (critic 오보정 → 정책 붕괴 방지) ──
+        if returns.std() > 1e-6:
+            returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+
         # ── Forward pass ──────────────────────────────────
         logits, values = self.net(states, seqs, seq_lens)  # (B,7), (B,1)
         values = values.squeeze(-1)                         # (B,)
 
         # ── Advantages ───────────────────────────────────
         advantages = (returns - values.detach())
-        # 정규화 (분산이 0이면 skip)
-        if advantages.std() > 1e-6:
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        # 클리핑으로 극단적 advantage 억제 (±5 sigma 수준)
+        advantages = advantages.clamp(-5.0, 5.0)
 
         # ── Actor 손실 (Policy Gradient + Entropy) ────────
         masked_logits = logits.masked_fill(~valid_masks, float('-inf'))
@@ -272,11 +275,11 @@ class RLAgent(BaseAgent):
 
         actor_loss  = -(log_probs_act * advantages).mean() - self.entropy_coef * entropy
 
-        # ── Critic 손실 (MSE) ─────────────────────────────
-        critic_loss = F.mse_loss(values, returns)
+        # ── Critic 손실 (MSE, Huber로 outlier 억제) ───────
+        critic_loss = F.huber_loss(values, returns, delta=1.0)
 
         # ── 통합 손실 + 역전파 ────────────────────────────
-        total_loss = actor_loss + 0.5 * critic_loss
+        total_loss = actor_loss + 0.25 * critic_loss   # critic weight 0.5→0.25
         self.optim.zero_grad()
         total_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.clip_grad)

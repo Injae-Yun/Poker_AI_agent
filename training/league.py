@@ -123,10 +123,10 @@ class Snapshot:
 # ══════════════════════════════════════════════════════════
 
 MAIN_AGENT_CONFIGS = [
-    dict(name="NFSP_Tight",    eta=0.10, epsilon=0.05, entropy_coef=0.01, lr=2e-4,  asp_lr=4e-4),
-    dict(name="NFSP_Loose",    eta=0.10, epsilon=0.15, entropy_coef=0.03, lr=4e-4,  asp_lr=8e-4),
-    dict(name="NFSP_Balanced", eta=0.15, epsilon=0.10, entropy_coef=0.02, lr=3e-4,  asp_lr=5e-4),
-    dict(name="NFSP_Aggr",     eta=0.20, epsilon=0.08, entropy_coef=0.02, lr=3e-4,  asp_lr=5e-4),
+    dict(name="NFSP_Tight",    eta=0.10, epsilon=0.05, entropy_coef=0.003, lr=1e-4,  asp_lr=3e-4),
+    dict(name="NFSP_Loose",    eta=0.10, epsilon=0.12, entropy_coef=0.005, lr=2e-4,  asp_lr=5e-4),
+    dict(name="NFSP_Balanced", eta=0.15, epsilon=0.08, entropy_coef=0.005, lr=1e-4,  asp_lr=3e-4),
+    dict(name="NFSP_Aggr",     eta=0.20, epsilon=0.06, entropy_coef=0.003, lr=1e-4,  asp_lr=3e-4),
 ]
 
 
